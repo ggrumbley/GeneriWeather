@@ -4,11 +4,17 @@ import {
   Text,
   View,
   TextInput,
+  AsyncStorage,
   Image
 } from 'react-native'
-import Forecast from './Forecast'
 
-const API_URL = 'http://api.openweathermap.org/data/2.5/weather?zip='
+import Forecast from './components/Forecast'
+import LocationButton from './components/LocationButton'
+// import PhotoBackdrop from './components/PhotoBackdrop'
+// import textStyles from './styles/typography';
+
+const STORAGE_KEY = '@GeneriWeather:zip'
+const API_URL = 'http://api.openweathermap.org/data/2.5/weather?'
 const API_KEY = 'adc3bee64d54e6fecd1061e8b70a5c17'
 
 
@@ -16,19 +22,48 @@ class GeneriWeather extends React.Component {
   constructor(props) {
     super(props)
     this.state = {
-      zip: '',
       forecast: null
     }
+
+    // Bind event handlers, since we're using a ES2015 class.
+    this._getForecastForZip = this._getForecastForZip.bind(this);
+    this._getForecastForCoords = this._getForecastForCoords.bind(this);
+    this._handleTextChange = this._handleTextChange.bind(this);
+    this._getForecast = this._getForecast.bind(this);
   }
 
-  _handleTextChange(event) {
-    let zip = event.nativeEvent.text
-    this.setState({ zip: zip })
-    const URL = `${API_URL}${zip},us&APPID=${API_KEY}&units=imperial`
-    fetch(URL)
+  componentDidMount() {
+    AsyncStorage.getItem(STORAGE_KEY)
+      .then((val) => {
+        if (val !== null) {
+          this._getForecastForZip(val)
+        }
+      })
+      .catch((err) => console.warn(`AsyncStorage Err: ${err.message}`))
+      .done()
+  }
+
+  _getForecastForZip(zip) {
+    AsyncStorage.setItem(STORAGE_KEY, zip)
+      .then(() => console.log(`Saved Selection to disk: ${zip}`))
+      .catch((err) => console.log(`AsyncStorage Err: ${err.message}`))
+      .done()
+
+    this._getForecast(
+      `${API_URL}zip=${zip},us&units=imperial&APPID=${API_KEY}`
+    )
+  }
+
+  _getForecastForCoords(lat, lon) {
+    this._getForecast(
+      `${API_URL}lat=${lat}&lon=${lon}&units=imperial&APPID=${API_KEY}`
+    )
+  }
+
+  _getForecast(url, cb) {
+    fetch(url)
       .then((res) => res.json())
       .then((resJSON) => {
-        console.log(resJSON);
         this.setState({
           forecast: {
             main: resJSON.weather[0].main,
@@ -40,35 +75,48 @@ class GeneriWeather extends React.Component {
       .catch((err) => console.warn(err))
   }
 
+  _handleTextChange(e) {
+    let zip = e.nativeEvent.text;
+    this._getForecastForZip(zip);
+  }
+
   render() {
     let content = null
     if (this.state.forecast !== null) {
-      content = <Forecast
-                  main={this.state.forecast.main}
-                  description={this.state.forecast.description}
-                  temp={this.state.forecast.temp} />
+      content = (
+        <View style={styles.row}>
+          <Forecast
+            main={this.state.forecast.main}
+            description={this.state.forecast.description}
+            temp={this.state.forecast.temp}/>
+        </View>
+      )
     }
 
     return (
-        <View style={styles.container}>
-          <Image source={require('./flowers.png')}
-                 resizeMode='cover'
-                 style={styles.backdrop}>
-            <View style={styles.overlay}>
-              <View style={styles.row}>
-                <Text style={styles.mainText}>
-                  Current weather for
-                </Text>
-                <View style={styles.zipContainer}>
-                  <TextInput
-                    style={[styles.zipCode, styles.mainText]}
-                    onSubmitEditing={(e) => this._handleTextChange(e)}/>
-                </View>
+      <View style={styles.container}>
+        <Image source={require('./flowers.png')}
+               resizeMode='cover'
+               style={styles.backdrop}>
+          <View style={styles.overlay}>
+            <View style={styles.row}>
+              <Text style={styles.mainText}>
+                Current weather for
+              </Text>
+              <View style={styles.zipContainer}>
+                <TextInput
+                  style={[styles.mainText, styles.zipCode]}
+                  returnKeyType='go'
+                  onSubmitEditing={this._handleTextChange}/>
               </View>
-              {content}
             </View>
-          </Image>
-        </View>
+            <View style={styles.row}>
+              <LocationButton onGetCoords={this._getForecastForCoords}/>
+            </View>
+            {content}
+          </View>
+        </Image>
+      </View>
     )
   }
 }
@@ -100,6 +148,7 @@ const styles = StyleSheet.create({
   },
   zipCode: { flex: 1, flexBasis: 1, width: 50, height: baseFontSize },
   mainText: { fontSize: baseFontSize, color: "#FFFFFF" }
-});
+})
+
 
 export default GeneriWeather

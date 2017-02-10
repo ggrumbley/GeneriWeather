@@ -2,9 +2,8 @@ import React from 'react'
 import {
   StyleSheet,
   Text,
-  View
+  View,
 } from 'react-native'
-
 
 class Forecast extends React.Component {
   render () {
